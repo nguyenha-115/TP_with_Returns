@@ -30,9 +30,9 @@ for i in I:
         dist = euclid_distance(coord_i[i], coord_j[j])
         for k in K:
             c_ij_k[(i,j,k)] = dist * np.random.uniform(0.9,1.1)
-            tilde_c_ji_k[(j,i,k)] = dist * np.random.uniform(0.8,1.0)  
-
             t_ij_k[(i,j,k)] = dist * np.random.uniform(0.04,0.06)
+
+            tilde_c_ji_k[(j,i,k)] = dist * np.random.uniform(0.8,1.0)
             tilde_t_ji_k[(j,i,k)] = dist * np.random.uniform(0.03,0.05)
 
 Q_k = {k: int(np.random.uniform(60,120)) for k in K}

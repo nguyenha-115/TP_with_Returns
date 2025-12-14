@@ -1,122 +1,132 @@
-from gurobipy import Model, GRB, quicksum
+import gurobipy as gp
+from gurobipy import GRB
 from data import I, J, K, s_i, d_j, r_j, c_ij_k, t_ij_k, tilde_c_ji_k, tilde_t_ji_k, Q_k, T_max_k, N_max_k, lambda_weight
 
-m = Model("TP_with_Returns")
+model = gp.Model("TP_with_Returns")
 
-x = m.addVars(I, J, K, lb=0, vtype=GRB.CONTINUOUS, name="x")
-y = m.addVars(J, I, K, lb=0, vtype=GRB.CONTINUOUS, name="y")
-z = m.addVars(I, J, K, vtype=GRB.BINARY, name="z")
-w = m.addVars(J, I, K, vtype=GRB.BINARY, name="w")
+x = model.addVars(I, J, K, lb=0, vtype=GRB.CONTINUOUS, name="x")
+y = model.addVars(J, I, K, lb=0, vtype=GRB.CONTINUOUS, name="y")
+z = model.addVars(I, J, K, vtype=GRB.BINARY, name="z")
 
-m.setObjective(
-    quicksum(
+model.setObjective(
+    gp.quicksum(
         lambda_weight * c_ij_k[i,j,k] * x[i, j, k] +
         (1 - lambda_weight) * t_ij_k[i,j,k] * z[i, j, k] +
         lambda_weight * tilde_c_ji_k[j,i,k] * y[j, i, k] +
-        (1 - lambda_weight) * tilde_t_ji_k[j,i,k] * w[j, i, k]
+        (1 - lambda_weight) * tilde_t_ji_k[j,i,k] * z[i, j, k]
         for i in I for j in J for k in K
     ),
     GRB.MINIMIZE
 )
 
 # 1
-for j in J:
-    m.addConstr(quicksum(x[i, j, k] for i in I for k in K) == d_j[j])
+for i in I:
+    model.addConstr(gp.quicksum(x[i, j, k] for j in J for k in K) <= s_i[i])
 
 # 2. 
 for j in J:
-    if r_j[j] > 0:  
-        m.addConstr(quicksum(y[j, i, k] for i in I for k in K) == r_j[j])
-    else:  
-        for i in I:
-            for k in K:
-                m.addConstr(y[j, i, k] == 0)
+    model.addConstr(gp.quicksum(x[i, j, k] for i in I for k in K) == d_j[j])
 
 # 3. 
 for i in I:
     for j in J:
         for k in K:
-            m.addConstr(y[j, i, k] <= Q_k[k] * w[j, i, k])
+            model.addConstr(y[j, i, k] <= x[i, j, k])
 
 # 4. 
-for i in I:
-    m.addConstr(quicksum(x[i, j, k] for j in J for k in K) <= s_i[i])
+for j in J:
+    model.addConstr(gp.quicksum(y[j, i, k] for i in I for k in K) == r_j[j])
 
 # 5. 
 for i in I:
     for j in J:
         for k in K:
-            m.addConstr(x[i, j, k] <= Q_k[k] * z[i, j, k])
+            model.addConstr(y[j, i, k] <= Q_k[k] * z[i, j, k])
 
 # 6.
 for i in I:
     for j in J:
-        m.addConstr(quicksum(z[i, j, k] for k in K) <= N_max_k[i,j])
+        for k in K:
+            model.addConstr(x[i, j, k] <= Q_k[k] * z[i, j, k])
+            model.addConstr(y[j, i, k] <= Q_k[k] * z[i, j, k])
+
 
 # 7.
-for i in I:
-    for j in J:
-        for k in K:
-            m.addConstr(t_ij_k[i,j,k] * z[i, j, k] + tilde_t_ji_k[j,i,k] * w[j, i, k] <= T_max_k[k])
+for k in K:
+    model.addConstr(
+        gp.quicksum((t_ij_k[(i, j, k)] + tilde_t_ji_k[(j, i, k)]) * z[i, j, k] for i in I for j in J) <= T_max_k[k])
 
-# 8.
-# for i in I:
-#     for j in J:
-#         for k in K:
-#             m.addConstr(w[j, i, k] <= z[i, j, k])
+# 8
+for k in K:
+    model.addConstr(gp.quicksum(z[i, j, k] for i in I for j in J) <= len(I) * len(J))
 
-m.setParam('TimeLimit', 3600)
-m.setParam('MIPGap', 0.01)
-m.setParam('OutputFlag', 1)
 
-m.optimize()
+
+model.setParam('TimeLimit', 3600)
+model.setParam('MIPGap', 0.01)
+model.setParam('OutputFlag', 1)
+
+model.optimize()
 
 print("GIẢI PHÁP TỐI ƯU")
 print("=" * 60)
 
-if m.status == GRB.OPTIMAL:
-    print(f"Giá trị hàm mục tiêu: {m.objVal:.2f}")
+if model.status == GRB.OPTIMAL or model.status == GRB.TIME_LIMIT:
+    print(f"Giá trị hàm mục tiêu: {model.ObjVal:.2f}")
     
     print("\nPHÂN PHỐI HÀNG TỪ KHO ĐẾN CỬA HÀNG")
-    for i in I:
-        for j in J:
-            for k in K:
+    for k in K:
+        for i in I:
+            for j in J:
                 if x[i, j, k].X > 1e-6:
-                    print(f"Kho {i} → Cửa hàng {j} bằng xe {k}: {x[i,j,k].X:.2f} đơn vị")
-    
+                    print(
+                        f"Chuyến {k}: Kho {i} → Cửa hàng {j} | "
+                        f"Giao: {x[i, j, k].X:.2f}"
+                    )
+
     print("\nHÀNG TRẢ VỀ")
     has_return = False
     for j in J:
         if r_j[j] > 0:
-            print(f"\nCửa hàng {j} (tổng trả về: {r_j[j]} đơn vị):")
-            for i in I:
-                for k in K:
+            printed_header = False
+            for k in K:
+                for i in I:
                     if y[j, i, k].X > 1e-6:
-                        print(f"  → Kho {i} bằng xe {k}: {y[j,i,k].X:.2f} đơn vị")
+                        if not printed_header:
+                            print(f"Cửa hàng {j} (tổng trả: {r_j[j]}):")
+                            printed_header = True
+                        print(
+                            f"  → Kho {i} | Chuyến {k} | "
+                            f"Trả: {y[j, i, k].X:.2f}"
+                        )
                         has_return = True
     if not has_return:
         print("Không có hàng trả về")
     
     print("\nSỐ CHUYẾN XE")
-    for i in I:
-        for j in J:
-            for k in K:
-                if z[i,j,k].X > 0.5:
-                    delivery = x[i,j,k].X
-                    return_amt = y[j,i,k].X
-                    print(f"Xe {k}: Kho {i} → Cửa hàng {j} (giao: {delivery:.2f}, trả: {return_amt:.2f})")
-    
-elif m.status == GRB.INFEASIBLE:
-    print("Bài toán KHÔNG KHẢ THI")
-    print("Tính toán IIS")
-    m.computeIIS()
-    print("\nCác ràng buộc xung đột:")
-    for c in m.getConstrs():
+    for k in K:
+        for i in I:
+            for j in J:
+                if z[i, j, k].X > 0.5:
+                    print(
+                        f"Chuyến {k}: Kho {i} → Cửa hàng {j} | "
+                        f"Giao: {x[i,j,k].X:.2f}, "
+                        f"Trả: {y[j,i,k].X:.2f}"
+                    )
+
+elif model.status == GRB.INFEASIBLE:
+    print("BÀI TOÁN KHÔNG KHẢ THI")
+    print("Đang tính IIS...")
+    model.computeIIS()
+    print("\nCác ràng buộc gây xung đột:")
+    for c in model.getConstrs():
         if c.IISConstr:
-            print(f"  - {c.constrName}")
+            print(f"  - {c.ConstrName}")
     
-elif m.status == GRB.UNBOUNDED:
-    print("Bài toán KHÔNG BỊ CHẶN")
+elif model.status == GRB.UNBOUNDED:
+    print("Bài toán không bị chặn")
     
 else:
-    print(f"Tối ưu hóa không thành công. Mã trạng thái: {m.status}")
+    print(f"Tối ưu hóa không thành công. Mã trạng thái: {model.status}")
+
+
