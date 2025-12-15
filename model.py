@@ -7,6 +7,8 @@ model = gp.Model("TP_with_Returns")
 x = model.addVars(I, J, K, lb=0, vtype=GRB.CONTINUOUS, name="x")
 y = model.addVars(J, I, K, lb=0, vtype=GRB.CONTINUOUS, name="y")
 z = model.addVars(I, J, K, vtype=GRB.BINARY, name="z")
+w = model.addVars(I, K, vtype=GRB.BINARY, name="w")  
+
 
 model.setObjective(
     gp.quicksum(
@@ -19,9 +21,17 @@ model.setObjective(
     GRB.MINIMIZE
 )
 
+for k in K:
+    model.addConstr(gp.quicksum(w[i,k] for i in I) == 1)
+for i in I:
+    for j in J:
+        for k in K:
+            model.addConstr(z[i,j,k] <= w[i,k], name=f"link_z_w_{i}_{j}_{k}")
+
+
 # 1
 for i in I:
-    model.addConstr(gp.quicksum(x[i, j, k] for j in J for k in K) <= s_i[i])
+    model.addConstr(gp.quicksum(x[i,j,k] for j in J for k in K) <= s_i[i])
 
 # 2. 
 for j in J:
@@ -31,34 +41,33 @@ for j in J:
 for i in I:
     for j in J:
         for k in K:
-            model.addConstr(y[j, i, k] <= x[i, j, k])
+            model.addConstr(y[j,i,k] <= gp.quicksum(x[i,j,k] for i in I))
 
 # 4. 
 for j in J:
     model.addConstr(gp.quicksum(y[j, i, k] for i in I for k in K) == r_j[j])
 
 # 5. 
-for i in I:
-    for j in J:
-        for k in K:
-            model.addConstr(y[j, i, k] <= Q_k[k] * z[i, j, k])
+# for i in I:
+#     for j in J:
+#         for k in K:
+#             model.addConstr(x[i, j, k] <= Q_k[k] * z[i, j, k])
+#             model.addConstr(y[j, i, k] <= Q_k[k] * z[i, j, k])
 
 # 6.
 for i in I:
     for j in J:
         for k in K:
-            model.addConstr(x[i, j, k] <= Q_k[k] * z[i, j, k])
-            model.addConstr(y[j, i, k] <= Q_k[k] * z[i, j, k])
-
+            model.addConstr(x[i, j, k] + y[j, i, k] <= Q_k[k] * z[i, j, k])
 
 # 7.
 for k in K:
-    model.addConstr(
-        gp.quicksum((t_ij_k[(i, j, k)] + tilde_t_ji_k[(j, i, k)]) * z[i, j, k] for i in I for j in J) <= T_max_k[k])
+    model.addConstr(gp.quicksum((t_ij_k[(i, j, k)] + tilde_t_ji_k[(j, i, k)]) * z[i, j, k] for i in I for j in J) <= T_max_k[k])
 
 # 8
-for k in K:
-    model.addConstr(gp.quicksum(z[i, j, k] for i in I for j in J) <= len(I) * len(J))
+for i in I:
+    for j in J:
+        model.addConstr(gp.quicksum(z[i,j,k] for k in K) <= N_max_k[i,j])
 
 
 
@@ -119,9 +128,18 @@ elif model.status == GRB.INFEASIBLE:
     print("Đang tính IIS...")
     model.computeIIS()
     print("\nCác ràng buộc gây xung đột:")
-    for c in model.getConstrs():
-        if c.IISConstr:
-            print(f"  - {c.ConstrName}")
+    for constr in model.getConstrs():
+        if constr.IISConstr:
+            print(f"Constraint: {constr.ConstrName}")
+    print("\n=== CONFLICTING VARIABLE BOUNDS ===")
+    for var in model.getVars():
+        if var.IISLB:
+            print(f"Variable {var.VarName} has conflicting LOWER bound")
+        if var.IISUB:
+            print(f"Variable {var.VarName} has conflicting UPPER bound")
+    model.write("model_conflict.ilp")
+    print("IIS written to model_conflict.ilp")
+
     
 elif model.status == GRB.UNBOUNDED:
     print("Bài toán không bị chặn")

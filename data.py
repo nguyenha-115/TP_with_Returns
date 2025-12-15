@@ -3,9 +3,9 @@ import random
 
 np.random.seed(42)  
 
-I = list(range(5))
-J = list(range(10))
-K = list(range(4))
+I = list(range(1, 6))
+J = list(range(1, 11))
+K = list(range(1, 5))
 
 # giả sử tọa độ trong 100x100 km
 coord_i = {i: (np.random.uniform(0,100), np.random.uniform(0,100)) for i in I}
