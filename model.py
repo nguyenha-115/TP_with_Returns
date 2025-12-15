@@ -21,14 +21,6 @@ model.setObjective(
     GRB.MINIMIZE
 )
 
-for k in K:
-    model.addConstr(gp.quicksum(w[i,k] for i in I) == 1)
-for i in I:
-    for j in J:
-        for k in K:
-            model.addConstr(z[i,j,k] <= w[i,k], name=f"link_z_w_{i}_{j}_{k}")
-
-
 # 1
 for i in I:
     model.addConstr(gp.quicksum(x[i,j,k] for j in J for k in K) <= s_i[i])
@@ -69,7 +61,15 @@ for i in I:
     for j in J:
         model.addConstr(gp.quicksum(z[i,j,k] for k in K) <= N_max_k[i,j])
 
+# 9
+for k in K:
+    model.addConstr(gp.quicksum(w[i,k] for i in I) == 1)
 
+# 10
+for i in I:
+    for j in J:
+        for k in K:
+            model.addConstr(z[i,j,k] <= w[i,k])
 
 model.setParam('TimeLimit', 3600)
 model.setParam('MIPGap', 0.01)
