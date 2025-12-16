@@ -1,6 +1,6 @@
 import gurobipy as gp
 from gurobipy import GRB
-from data import I, J, K, s_i, d_j, r_j, c_ij_k, t_ij_k, tilde_c_ji_k, tilde_t_ji_k, Q_k, T_max_k, N_max_k, lambda_weight
+from data import I, J, K, s_i, d_j, r_j, c_ij_k, t_ij_k, tilde_c_ji_k, tilde_t_ji_k, Q_k, T_max_k, lambda_weight
 
 model = gp.Model("TP_with_Returns")
 
@@ -33,43 +33,33 @@ for j in J:
 for i in I:
     for j in J:
         for k in K:
-            model.addConstr(y[j,i,k] <= gp.quicksum(x[i,j,k] for i in I))
+            model.addConstr(y[j,i,k] <= r_j[j] * z[i,j,k])
 
 # 4. 
 for j in J:
     model.addConstr(gp.quicksum(y[j, i, k] for i in I for k in K) == r_j[j])
-
+                    
 # 5. 
-# for i in I:
-#     for j in J:
-#         for k in K:
-#             model.addConstr(x[i, j, k] <= Q_k[k] * z[i, j, k])
-#             model.addConstr(y[j, i, k] <= Q_k[k] * z[i, j, k])
-
-# 6.
 for i in I:
-    for j in J:
-        for k in K:
-            model.addConstr(x[i, j, k] + y[j, i, k] <= Q_k[k] * z[i, j, k])
+    for k in K:
+        model.addConstr(gp.quicksum(x[i, j, k] for j in J) <= Q_k[k] * w[i,k]) 
+        model.addConstr(gp.quicksum(y[j, i, k] for j in J) <= Q_k[k] * w[i,k]) 
 
-# 7.
+# 8.
 for k in K:
     model.addConstr(gp.quicksum((t_ij_k[(i, j, k)] + tilde_t_ji_k[(j, i, k)]) * z[i, j, k] for i in I for j in J) <= T_max_k[k])
 
-# 8
-# for i in I:
-#     for j in J:
-#         model.addConstr(gp.quicksum(z[i,j,k] for k in K) <= N_max_k[i,j])
-
-# 9
+# 6.
 for k in K:
     model.addConstr(gp.quicksum(w[i,k] for i in I) == 1)
 
-# 10
+# 7.
 for i in I:
     for j in J:
         for k in K:
             model.addConstr(z[i,j,k] <= w[i,k])
+
+
 
 model.setParam('TimeLimit', 3600)
 model.setParam('MIPGap', 0.01)

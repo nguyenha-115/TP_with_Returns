@@ -18,7 +18,7 @@ s_i = {i: int(np.random.uniform(100, 200)) for i in I}
 
 d_j = {j: int(np.random.uniform(20, 50)) for j in J}
 
-r_j = {j: int(d_j[j]*np.random.uniform(0.1,0.4)) for j in J}
+r_j = {j: int(d_j[j]*np.random.uniform(0.2,0.4)) for j in J}
 
 c_ij_k = {}
 t_ij_k = {}
@@ -29,26 +29,15 @@ for i in I:
     for j in J:
         dist = euclid_distance(coord_i[i], coord_j[j])
         for k in K:
-            c_ij_k[(i,j,k)] = dist * np.random.uniform(0.9,1.1)
-            t_ij_k[(i,j,k)] = dist * np.random.uniform(0.04,0.06)
+            c_ij_k[(i,j,k)] = round(dist * np.random.uniform(0.9, 1.1), 2)
+            t_ij_k[(i,j,k)] = round(dist / 60 * np.random.uniform(0.9, 1.1), 2)
 
-            tilde_c_ji_k[(j,i,k)] = dist * np.random.uniform(0.8,1.0)
-            tilde_t_ji_k[(j,i,k)] = dist * np.random.uniform(0.03,0.05)
+            tilde_c_ji_k[(j,i,k)] = round(dist * np.random.uniform(0.8, 1.0), 2) 
+            tilde_t_ji_k[(j,i,k)] = round(dist / 60 * np.random.uniform(0.8, 1.0), 2)
 
-Q_k = {k: int(np.random.uniform(60,120)) for k in K}
+Q_k = {k: int(np.random.uniform(100,200)) for k in K}
 
-T_max_k = {k: float(np.random.uniform(8,12)) for k in K}
-
-N_max_k = {}
-for i in I:
-    for j in J:
-        dist = euclid_distance(coord_i[i], coord_j[j])
-        if dist < 30:
-            N_max_k[(i,j)] = np.random.randint(2,4)
-        elif dist < 60:
-            N_max_k[(i,j)] = np.random.randint(1,3)
-        else:
-            N_max_k[(i,j)] = 1
+T_max_k = {k: float(np.random.uniform(8, 12)) for k in K}
 
 lambda_weight = 0.6
 
@@ -68,5 +57,4 @@ if __name__ == "__main__":
     print("tilde_t_ji_k =", tilde_t_ji_k)
     print("Q_k =", Q_k)
     print("T_max_k =", T_max_k)
-    print("N_max_k =", N_max_k)
     print("lambda_weight =", lambda_weight)
