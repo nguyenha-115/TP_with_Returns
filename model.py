@@ -57,9 +57,9 @@ for k in K:
     model.addConstr(gp.quicksum((t_ij_k[(i, j, k)] + tilde_t_ji_k[(j, i, k)]) * z[i, j, k] for i in I for j in J) <= T_max_k[k])
 
 # 8
-for i in I:
-    for j in J:
-        model.addConstr(gp.quicksum(z[i,j,k] for k in K) <= N_max_k[i,j])
+# for i in I:
+#     for j in J:
+#         model.addConstr(gp.quicksum(z[i,j,k] for k in K) <= N_max_k[i,j])
 
 # 9
 for k in K:
